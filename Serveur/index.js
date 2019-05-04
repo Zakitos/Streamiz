@@ -1,12 +1,48 @@
-// Serveur Web
-var express = require('express');
+// app Web
+const express = require('express')
+const fs = require('fs')
+const path = require('path')
+var app = express();
 
-var serveur = express();
-serveur.get('/',function(req,res){
-  res.setHeader('Content-Type','text/html'); // envoie d'un code HTML
-  res.status(200).send('<h1>Futur Site de Streaming</h1>')
-});
-// Lancement du Serveur
-serveur.listen(8080,function() {
+app.get('/', function(req, res) {
+  res.sendFile(path.join(__dirname + '/index.html'))
+})
+
+app.get('/video', function(req, res) {
+  const path = '/mnt/HDD1/Films/Neuilly.sa.mère.FRENCH.BluRay.1080p.x264.DTS.2009 - FHD.'
+  const stat = fs.statSync(path)
+  const fileSize = stat.size
+  const range = req.headers.range
+
+  if (range) {
+    const parts = range.replace(/bytes=/, "").split("-")
+    const start = parseInt(parts[0], 10)
+    const end = parts[1]
+      ? parseInt(parts[1], 10)
+      : fileSize-1
+
+    const chunksize = (end-start)+1
+    const file = fs.createReadStream(path, {start, end})
+    const head = {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': 'video/x-matroska',
+    }
+
+    res.writeHead(206, head)
+    file.pipe(res)
+  } else {
+    const head = {
+      'Content-Length': fileSize,
+      'Content-Type': 'video/x-matroska',
+    }
+    res.writeHead(200, head)
+    fs.createReadStream(path).pipe(res)
+  }
+})
+
+// Lancement du app
+app.listen(8080,function() {
   console.log("Serveur en écoute");
 });
